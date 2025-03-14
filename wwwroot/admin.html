@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Session Management</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .navbar {
+            background-color: #2c3e50;
+            padding: 1rem;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .navbar h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+        .back-btn, .logout-btn {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 0.5rem;
+        }
+        .back-btn {
+            background-color: #7f8c8d;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .section {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .revoke-btn {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .revoke-all-btn {
+            background-color: #c0392b;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+        .status {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            display: inline-block;
+            font-size: 0.85rem;
+        }
+        .active {
+            background-color: #2ecc71;
+            color: white;
+        }
+        .inactive {
+            background-color: #7f8c8d;
+            color: white;
+        }
+        .error {
+            color: #e74c3c;
+            margin-top: 1rem;
+            display: none;
+        }
+    </style>
+    <script src="/js/auth.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <h1>Session Management</h1>
+        <div>
+            <button class="back-btn" onclick="location.href='/dashboard.html'">Back to Dashboard</button>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="section">
+            <h2>Active Sessions</h2>
+            <p>Below are all active sessions for your account. You can revoke individual sessions or all sessions.</p>
+            
+            <div id="sessionsContainer">
+                <p>Loading sessions...</p>
+            </div>
+            
+            <button id="revokeAllBtn" class="revoke-all-btn" onclick="revokeAllSessions()">Revoke All Sessions</button>
+            <div id="error" class="error"></div>
+        </div>
+    </div>
+
+    <script>
+        // Fetch user sessions with token refresh handling
+        async function fetchSessions() {
+            document.getElementById('sessionsContainer').innerHTML = '<p>Loading sessions...</p>';
+            
+            try {
+                console.log('Attempting to fetch sessions');
+                const response = await fetchWithTokenRefresh('/api/auth/sessions');
+                console.log('Sessions response status:', response.status);
+                
+                const sessions = await response.json();
+                console.log('Received sessions data:', sessions);
+                
+                displaySessions(sessions);
+            } catch (error) {
+                console.error('Sessions fetch error:', error);
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = 'Failed to load sessions: ' + error.message;
+                document.getElementById('sessionsContainer').innerHTML = '<p>Failed to load sessions. Please try refreshing the page.</p>';
+            }
+        }
+        
+        // Display sessions in table
+        function displaySessions(sessions) {
+            const container = document.getElementById('sessionsContainer');
+            
+            if (!sessions || sessions.length === 0) {
+                container.innerHTML = '<p>No sessions found. This may be a bug - please try logging out and back in.</p>';
+                return;
+            }
+            
+            const table = document.createElement('table');
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Session ID</th>
+                        <th>Created</th>
+                        <th>Expires</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="sessionsTableBody">
+                </tbody>
+            `;
+            
+            const tbody = table.querySelector('#sessionsTableBody');
+            
+            sessions.forEach(session => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${session.sessionId.substring(0, 8)}...</td>
+                    <td>${new Date(session.createdDate).toLocaleString()}</td>
+                    <td>${new Date(session.expiryDate).toLocaleString()}</td>
+                    <td><span class="status ${session.isActive ? 'active' : 'inactive'}">${session.isActive ? 'Active' : 'Inactive'}</span></td>
+                    <td>
+                        ${session.isActive ? 
+                            `<button class="revoke-btn" onclick="revokeSession('${session.sessionId}')">Revoke</button>` : 
+                            'Already revoked'}
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            container.innerHTML = '';
+            container.appendChild(table);
+        }
+        
+        // Revoke a specific session
+        async function revokeSession(sessionId) {
+            try {
+                const response = await fetchWithTokenRefresh(`/api/auth/revoke-session/${sessionId}`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    // Refresh the sessions list
+                    fetchSessions();
+                }
+            } catch (error) {
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = 'Failed to revoke session. Please try again.';
+                console.error('Revoke session error:', error);
+            }
+        }
+        
+        // Revoke all sessions
+        async function revokeAllSessions() {
+            if (!confirm('Are you sure you want to revoke all sessions? This will log you out of all devices.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetchWithTokenRefresh('/api/auth/revoke-all-sessions', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    // Redirect to login since all sessions are revoked
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = 'Failed to revoke all sessions. Please try again.';
+                console.error('Revoke all sessions error:', error);
+            }
+        }
+        
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('DOM loaded, checking auth and fetching sessions');
+            const isAuthenticated = await checkAuth();
+            if (isAuthenticated) {
+                fetchSessions();
+            }
+        });
+    </script>
+</body>
+</html> 
