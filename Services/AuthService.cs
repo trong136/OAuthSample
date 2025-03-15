@@ -17,32 +17,63 @@ public class AuthService
     private readonly JwtConfig _jwtConfig;
     private readonly IConfiguration _configuration;
     private readonly TokenRepository _tokenRepository;
+    private readonly UserRepository _userRepository;
+    private readonly RoleRepository _roleRepository;
+    private readonly PermissionRepository _permissionRepository;
 
-    public AuthService(IConfiguration configuration, TokenRepository tokenRepository)
+    public AuthService(
+        IConfiguration configuration, 
+        TokenRepository tokenRepository,
+        UserRepository userRepository,
+        RoleRepository roleRepository,
+        PermissionRepository permissionRepository)
     {
         _configuration = configuration;
         _tokenRepository = tokenRepository;
+        _userRepository = userRepository;
+        _roleRepository = roleRepository;
+        _permissionRepository = permissionRepository;
         _jwtConfig = configuration.GetSection("JwtConfig").Get<JwtConfig>() ?? new JwtConfig();
         
         Console.WriteLine("New AuthService instance created");
     }
 
-    public bool ValidateUser(User user)
+    public bool ValidateUser(string username, string password)
     {
-        // Hardcoded user credentials for demo purposes
-        return user.Username == "admin" && user.Password == "password123";
+        // Look up the user in the user repository
+        var user = _userRepository.GetUserByUsername(username);
+        if (user == null) return false;
+        
+        // Check if the password matches (in a real application, this would be hashed)
+        return user.Password == password && user.IsActive;
     }
 
-    public string GenerateJwtToken(User user)
+    public string GenerateJwtToken(string username)
     {
+        var user = _userRepository.GetUserByUsername(username);
+        if (user == null)
+        {
+            throw new ArgumentException("User not found");
+        }
+        
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtConfig.Secret));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-        var claims = new[]
+        // Get the user's roles
+        var roles = _roleRepository.GetUserRoles(user.Id);
+        
+        var claims = new List<Claim>
         {
             new Claim(ClaimTypes.Name, user.Username),
+            new Claim("userId", user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
         };
+        
+        // Add role claims
+        foreach (var role in roles)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role.Name));
+        }
 
         var token = new JwtSecurityToken(
             issuer: _jwtConfig.Issuer,

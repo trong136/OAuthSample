@@ -10,6 +10,7 @@
             margin: 0;
             padding: 0;
             background-color: #f5f5f5;
+            padding-top: 70px; /* Add padding to body to account for fixed navbar */
         }
         .navbar {
             background-color: #2c3e50;
@@ -18,10 +19,37 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: fixed; /* Fix navbar at top */
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000; /* Ensure navbar is above other content */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* Add shadow for depth */
         }
         .navbar h1 {
             margin: 0;
             font-size: 1.5rem;
+        }
+        .nav-links {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .nav-btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: background-color 0.2s; /* Smooth transition for hover effect */
+            font-size: 14px;
+            text-align: center;
+            min-width: 100px; /* Consistent width for all buttons */
+        }
+        .nav-btn:hover {
+            background-color: #2980b9;
         }
         .logout-btn {
             background-color: #e74c3c;
@@ -30,6 +58,10 @@
             padding: 0.5rem 1rem;
             border-radius: 4px;
             cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 14px;
+            min-width: 100px;
+            text-align: center;
         }
         .logout-btn:hover {
             background-color: #c0392b;
@@ -79,15 +111,30 @@
             margin-top: 1rem;
             display: none;
         }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .nav-links {
+                flex-wrap: wrap;
+                justify-content: flex-end;
+            }
+            .nav-btn, .logout-btn {
+                margin-bottom: 5px;
+                min-width: auto;
+            }
+        }
     </style>
     <script src="/js/auth.js"></script>
 </head>
 <body>
     <nav class="navbar">
         <h1>Dashboard</h1>
-        <div>
-            <button class="logout-btn" onclick="location.href='/contacts.html'">Manage Contacts</button>
-            <button class="logout-btn" onclick="location.href='/admin.html'">Manage Sessions</button>
+        <div class="nav-links">
+            <a href="/contacts.html" class="nav-btn">Manage Contacts</a>
+            <a href="/users.html" class="nav-btn">Manage Users</a>
+            <a href="/roles.html" class="nav-btn">Manage Roles</a>
+            <a href="/permissions.html" class="nav-btn">Manage Permissions</a>
+            <a href="/admin.html" class="nav-btn">Manage Sessions</a>
             <button class="logout-btn" onclick="logout()">Logout</button>
         </div>
     </nav>
@@ -111,9 +158,24 @@
         // Fetch and display weather data with token refresh handling
         async function fetchWeather() {
             try {
+                // Show loading state
+                const weatherGrid = document.getElementById('weatherGrid');
+                weatherGrid.innerHTML = '<div style="text-align: center; width: 100%;">Loading weather data...</div>';
+                
                 // Try to fetch weather data
                 const response = await fetchWithTokenRefresh('/api/weatherforecast');
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch weather data: ${response.status} ${response.statusText}`);
+                }
+                
                 const data = await response.json();
+                
+                if (!data || !Array.isArray(data) || data.length === 0) {
+                    throw new Error('Invalid weather data received');
+                }
+                
+                console.log('Weather data received:', data);
                 displayWeather(data);
             } catch (error) {
                 document.getElementById('error').style.display = 'block';

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using System.Security.Claims;
 using OAuthSample.Models;
 using OAuthSample.Services;
+using OAuthSample.Authorization;
 
 namespace OAuthSample.Controllers;
 
@@ -12,25 +13,32 @@ namespace OAuthSample.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly AuthService _authService;
+    private readonly UserRepository _userRepository;
+    private readonly PermissionService _permissionService;
 
-    public AuthController(AuthService authService)
+    public AuthController(
+        AuthService authService,
+        UserRepository userRepository,
+        PermissionService permissionService)
     {
         _authService = authService;
+        _userRepository = userRepository;
+        _permissionService = permissionService;
     }
 
     [HttpPost("login")]
-    public IActionResult Login([FromBody] User user)
+    public IActionResult Login([FromBody] LoginRequest request)
     {
-        if (!_authService.ValidateUser(user))
+        if (!_authService.ValidateUser(request.Username, request.Password))
         {
             return Unauthorized();
         }
 
         // Generate JWT token
-        var token = _authService.GenerateJwtToken(user);
+        var token = _authService.GenerateJwtToken(request.Username);
         
         // Generate refresh token
-        var refreshToken = _authService.CreateRefreshToken(user.Username);
+        var refreshToken = _authService.CreateRefreshToken(request.Username);
         
         // Set the JWT token in an HTTP-only cookie (short-lived)
         Response.Cookies.Append("jwt", token, new CookieOptions
@@ -49,8 +57,43 @@ public class AuthController : ControllerBase
             SameSite = SameSiteMode.Strict,
             Expires = DateTimeOffset.UtcNow.AddDays(7) // 7 days
         });
+        
+        // Set the session ID in a cookie (for session management)
+        Response.Cookies.Append("session_id", refreshToken.SessionId, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Expires = DateTimeOffset.UtcNow.AddDays(7) // 7 days
+        });
 
-        return Ok(new { message = "Login successful" });
+        // Get user information
+        var user = _userRepository.GetUserByUsername(request.Username);
+        if (user == null)
+        {
+            return Unauthorized();
+        }
+        
+        // Get user permissions
+        var permissions = _permissionService.GetUserPermissions(user.Id);
+        
+        // Return user info and token details
+        return Ok(new
+        {
+            user = new
+            {
+                user.Id,
+                user.Username,
+                user.Email,
+                user.FirstName,
+                user.LastName
+            },
+            token,
+            refreshToken = refreshToken.Token,
+            sessionId = refreshToken.SessionId,
+            expiresAt = DateTimeOffset.UtcNow.AddMinutes(15),
+            permissions = permissions.Select(p => p.Name).ToList()
+        });
     }
 
     [HttpPost("refresh-token")]
@@ -68,11 +111,11 @@ public class AuthController : ControllerBase
         if (validatedToken == null)
             return Unauthorized(new { message = "Invalid or expired token" });
             
-        // Create a user object to generate a new JWT token
-        var user = new User { Username = validatedToken.Username };
+        // Get the username from the validated token
+        var username = validatedToken.Username;
         
         // Generate a new JWT token
-        var newJwtToken = _authService.GenerateJwtToken(user);
+        var newJwtToken = _authService.GenerateJwtToken(username);
         
         // Set the new JWT token in an HTTP-only cookie
         Response.Cookies.Append("jwt", newJwtToken, new CookieOptions
@@ -214,4 +257,10 @@ public class AuthController : ControllerBase
         
         return Ok(new { message = "All sessions revoked successfully" });
     }
+}
+
+public class LoginRequest
+{
+    public string Username { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
 } 

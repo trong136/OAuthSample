@@ -5,6 +5,7 @@ using System.Security.Claims;
 using System.Text;
 using OAuthSample.Configuration;
 using OAuthSample.Services;
+using OAuthSample.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -95,59 +96,84 @@ void ConfigureServices(IServiceCollection services, IConfiguration configuration
     // Register application services
     services.AddSingleton<TokenRepository>();
     services.AddSingleton<ContactRepository>();
+    services.AddSingleton<UserRepository>();
+    services.AddSingleton<RoleRepository>();
+    services.AddSingleton<PermissionRepository>();
     services.AddScoped<AuthService>();
+    services.AddScoped<PermissionService>();
 }
 
 // Middleware configuration
 void ConfigureMiddleware(WebApplication app)
 {
-    // Development-specific middleware
-    if (app.Environment.IsDevelopment())
-    {
-        app.UseSwagger();
-        app.UseSwaggerUI();
-    }
+    app.UseSwagger();
+    app.UseSwaggerUI();
 
-    // Standard middleware pipeline
     app.UseHttpsRedirection();
-    app.UseStaticFiles();
+
     app.UseAuthentication();
     app.UseAuthorization();
-    app.MapControllers();
+
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
 }
 
 // Endpoint configuration
 void ConfigureEndpoints(WebApplication app)
 {
+    app.MapControllers();
+    
     // Redirect root to index.html
     app.MapGet("/", () => Results.Redirect("/index.html"));
-
-    // Weather forecast data
-    var summaries = new[]
+    
+    // Add default admin role to admin user with all permissions during startup
+    using (var scope = app.Services.CreateScope())
     {
-        "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-    };
-
-    // Map the weather forecast endpoint to match the API pattern used elsewhere
-    app.MapGet("/api/weatherforecast", () =>
-    {
-        var forecast = Enumerable.Range(1, 5).Select(index =>
-            new WeatherForecast
-            (
-                DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                Random.Shared.Next(-20, 55),
-                summaries[Random.Shared.Next(summaries.Length)]
-            ))
-            .ToArray();
-        return forecast;
-    })
-    .WithName("GetWeatherForecast")
-    .WithOpenApi()
-    .RequireAuthorization();
+        var userRepository = scope.ServiceProvider.GetRequiredService<UserRepository>();
+        var roleRepository = scope.ServiceProvider.GetRequiredService<RoleRepository>();
+        var permissionRepository = scope.ServiceProvider.GetRequiredService<PermissionRepository>();
+        
+        // Get the admin user
+        var adminUser = userRepository.GetUserByUsername("admin");
+        if (adminUser != null)
+        {
+            // Get the admin role
+            var adminRole = roleRepository.GetRoleByName("Administrator");
+            if (adminRole != null)
+            {
+                // Assign admin role to admin user
+                roleRepository.AssignRoleToUser(adminUser.Id, adminRole.Id);
+                
+                // Assign all permissions to admin role
+                var allPermissions = permissionRepository.GetAllPermissions();
+                foreach (var permission in allPermissions)
+                {
+                    permissionRepository.AssignPermissionToRole(adminRole.Id, permission.Id);
+                }
+            }
+        }
+        
+        // Get the regular user
+        var regularUser = userRepository.GetUserByUsername("user");
+        if (regularUser != null)
+        {
+            // Get the user role
+            var userRole = roleRepository.GetRoleByName("User");
+            if (userRole != null)
+            {
+                // Assign user role to regular user
+                roleRepository.AssignRoleToUser(regularUser.Id, userRole.Id);
+                
+                // Assign basic permissions to user role (e.g., viewing contacts)
+                var permissionViewContacts = permissionRepository.GetPermissionByName("contacts.view");
+                if (permissionViewContacts != null)
+                {
+                    permissionRepository.AssignPermissionToRole(userRole.Id, permissionViewContacts.Id);
+                }
+            }
+        }
+    }
 }
 
-// Models
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
+// Weather forecast demo endpoint (can be removed in production)
+// ... existing code ...
