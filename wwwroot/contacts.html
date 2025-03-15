@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact Management</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .navbar {
+            background-color: #2c3e50;
+            padding: 1rem;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .navbar h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+        .navbar-links {
+            display: flex;
+            gap: 1rem;
+        }
+        .btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        .btn-danger {
+            background-color: #e74c3c;
+        }
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+        .btn-success {
+            background-color: #2ecc71;
+        }
+        .btn-success:hover {
+            background-color: #27ae60;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .card {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+        .contacts-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .contacts-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .contacts-table th,
+        .contacts-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .contacts-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .contacts-table tr:hover {
+            background-color: #f5f5f5;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            overflow: auto;
+        }
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 2rem;
+            border-radius: 8px;
+            max-width: 500px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .modal-header h2 {
+            margin: 0;
+        }
+        .close {
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover {
+            color: #555;
+        }
+        .hidden {
+            display: none;
+        }
+        .error {
+            color: #e74c3c;
+            margin-top: 1rem;
+        }
+    </style>
+    <script src="/js/auth.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <h1>Contact Management</h1>
+        <div class="navbar-links">
+            <button class="btn" onclick="location.href='/dashboard.html'">Dashboard</button>
+            <button class="btn btn-danger" onclick="logout()">Logout</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card">
+            <div class="contacts-header">
+                <h2>My Contacts</h2>
+                <button class="btn btn-success" onclick="openCreateModal()">Add New Contact</button>
+            </div>
+            <div id="contactsTable">
+                <table class="contacts-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Company</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="contactsTableBody">
+                        <!-- Contacts will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+            <div id="noContacts" class="hidden">
+                <p>No contacts found. Click the "Add New Contact" button to create your first contact.</p>
+            </div>
+            <div id="loadingContacts">
+                <p>Loading contacts...</p>
+            </div>
+            <div id="errorContacts" class="hidden error">
+                <p>Failed to load contacts. Please try again later.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Contact Modal -->
+    <div id="contactModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Add New Contact</h2>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <form id="contactForm" onsubmit="saveContact(event)">
+                <input type="hidden" id="contactId">
+                <div class="form-group">
+                    <label for="name">Name *</label>
+                    <input type="text" id="name" required maxlength="100">
+                </div>
+                <div class="form-group">
+                    <label for="email">Email *</label>
+                    <input type="email" id="email" required maxlength="100">
+                </div>
+                <div class="form-group">
+                    <label for="phone">Phone</label>
+                    <input type="tel" id="phone" maxlength="20">
+                </div>
+                <div class="form-group">
+                    <label for="company">Company</label>
+                    <input type="text" id="company" maxlength="100">
+                </div>
+                <div class="form-group">
+                    <label for="notes">Notes</label>
+                    <textarea id="notes" rows="3" maxlength="500"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-success">Save</button>
+                </div>
+                <div id="errorForm" class="hidden error">
+                    <p>An error occurred. Please try again.</p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Delete Contact</h2>
+                <span class="close" onclick="closeDeleteModal()">&times;</span>
+            </div>
+            <p>Are you sure you want to delete this contact? This action cannot be undone.</p>
+            <div class="form-actions">
+                <button type="button" class="btn" onclick="closeDeleteModal()">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDelete()">Delete</button>
+            </div>
+            <div id="errorDelete" class="hidden error">
+                <p>Failed to delete contact. Please try again.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Contact being deleted
+        let currentDeleteId = null;
+        
+        // Check authentication and load contacts
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('Contacts page: DOM loaded, checking auth');
+            const isAuthenticated = await checkAuth();
+            if (isAuthenticated) {
+                fetchContacts();
+            }
+        });
+        
+        // Fetch all contacts
+        async function fetchContacts() {
+            try {
+                const response = await fetchWithTokenRefresh('/api/contacts');
+                const contacts = await response.json();
+                
+                document.getElementById('loadingContacts').classList.add('hidden');
+                
+                if (contacts.length === 0) {
+                    document.getElementById('contactsTable').classList.add('hidden');
+                    document.getElementById('noContacts').classList.remove('hidden');
+                } else {
+                    document.getElementById('contactsTable').classList.remove('hidden');
+                    document.getElementById('noContacts').classList.add('hidden');
+                    displayContacts(contacts);
+                }
+            } catch (error) {
+                document.getElementById('loadingContacts').classList.add('hidden');
+                document.getElementById('errorContacts').classList.remove('hidden');
+                console.error('Error fetching contacts:', error);
+            }
+        }
+        
+        // Display contacts in the table
+        function displayContacts(contacts) {
+            const tableBody = document.getElementById('contactsTableBody');
+            tableBody.innerHTML = '';
+            
+            contacts.forEach(contact => {
+                const row = document.createElement('tr');
+                
+                // Format the date
+                const createdDate = new Date(contact.createdDate).toLocaleDateString();
+                
+                row.innerHTML = `
+                    <td>${escapeHtml(contact.name)}</td>
+                    <td>${escapeHtml(contact.email)}</td>
+                    <td>${escapeHtml(contact.phone || '')}</td>
+                    <td>${escapeHtml(contact.company || '')}</td>
+                    <td>${createdDate}</td>
+                    <td class="action-buttons">
+                        <button class="btn" onclick="editContact('${contact.id}')">Edit</button>
+                        <button class="btn btn-danger" onclick="deleteContact('${contact.id}')">Delete</button>
+                    </td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        }
+        
+        // Escape HTML to prevent XSS
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+        
+        // Open create contact modal
+        function openCreateModal() {
+            document.getElementById('modalTitle').textContent = 'Add New Contact';
+            document.getElementById('contactId').value = '';
+            document.getElementById('contactForm').reset();
+            document.getElementById('errorForm').classList.add('hidden');
+            document.getElementById('contactModal').style.display = 'block';
+        }
+        
+        // Open edit contact modal
+        async function editContact(id) {
+            try {
+                const response = await fetchWithTokenRefresh(`/api/contacts/${id}`);
+                const contact = await response.json();
+                
+                document.getElementById('modalTitle').textContent = 'Edit Contact';
+                document.getElementById('contactId').value = contact.id;
+                document.getElementById('name').value = contact.name;
+                document.getElementById('email').value = contact.email;
+                document.getElementById('phone').value = contact.phone || '';
+                document.getElementById('company').value = contact.company || '';
+                document.getElementById('notes').value = contact.notes || '';
+                
+                document.getElementById('errorForm').classList.add('hidden');
+                document.getElementById('contactModal').style.display = 'block';
+            } catch (error) {
+                console.error('Error fetching contact:', error);
+                alert('Failed to load contact details. Please try again.');
+            }
+        }
+        
+        // Close contact modal
+        function closeModal() {
+            document.getElementById('contactModal').style.display = 'none';
+        }
+        
+        // Save contact (create or update)
+        async function saveContact(event) {
+            event.preventDefault();
+            document.getElementById('errorForm').classList.add('hidden');
+            
+            const id = document.getElementById('contactId').value;
+            const isEdit = id !== '';
+            
+            const contact = {
+                id: isEdit ? id : crypto.randomUUID(),
+                name: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                phone: document.getElementById('phone').value,
+                company: document.getElementById('company').value,
+                notes: document.getElementById('notes').value
+            };
+            
+            try {
+                let response;
+                
+                if (isEdit) {
+                    // Update existing contact
+                    response = await fetchWithTokenRefresh(`/api/contacts/${id}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(contact)
+                    });
+                } else {
+                    // Create new contact
+                    response = await fetchWithTokenRefresh('/api/contacts', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(contact)
+                    });
+                }
+                
+                if (response.ok) {
+                    closeModal();
+                    fetchContacts();
+                } else {
+                    const error = await response.json();
+                    console.error('Error saving contact:', error);
+                    document.getElementById('errorForm').classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Error saving contact:', error);
+                document.getElementById('errorForm').classList.remove('hidden');
+            }
+        }
+        
+        // Open delete confirmation modal
+        function deleteContact(id) {
+            currentDeleteId = id;
+            document.getElementById('errorDelete').classList.add('hidden');
+            document.getElementById('deleteModal').style.display = 'block';
+        }
+        
+        // Close delete confirmation modal
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').style.display = 'none';
+            currentDeleteId = null;
+        }
+        
+        // Confirm and execute delete
+        async function confirmDelete() {
+            if (!currentDeleteId) return;
+            
+            try {
+                const response = await fetchWithTokenRefresh(`/api/contacts/${currentDeleteId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    closeDeleteModal();
+                    fetchContacts();
+                } else {
+                    document.getElementById('errorDelete').classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Error deleting contact:', error);
+                document.getElementById('errorDelete').classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html> 

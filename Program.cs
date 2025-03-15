@@ -94,6 +94,7 @@ void ConfigureServices(IServiceCollection services, IConfiguration configuration
 
     // Register application services
     services.AddSingleton<TokenRepository>();
+    services.AddSingleton<ContactRepository>();
     services.AddScoped<AuthService>();
 }
 
