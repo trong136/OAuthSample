@@ -26,13 +26,9 @@ public class UsersController : ControllerBase
     }
     
     [HttpGet]
+    [RequirePermission("users.view")]
     public IActionResult GetAllUsers()
     {
-        if (!_permissionService.HasPermission(User, "users.view"))
-        {
-            return Forbid();
-        }
-        
         var users = _userRepository.GetAllUsers();
         
         // Don't return passwords in the response
@@ -52,13 +48,9 @@ public class UsersController : ControllerBase
     }
     
     [HttpGet("{id}")]
+    [RequirePermission("users.view")]
     public IActionResult GetUserById(Guid id)
     {
-        if (!_permissionService.HasPermission(User, "users.view"))
-        {
-            return Forbid();
-        }
-        
         var user = _userRepository.GetUserById(id);
         if (user == null)
         {
@@ -83,13 +75,9 @@ public class UsersController : ControllerBase
     }
     
     [HttpPost]
+    [RequirePermission("users.create")]
     public IActionResult CreateUser([FromBody] User user)
     {
-        if (!_permissionService.HasPermission(User, "users.create"))
-        {
-            return Forbid();
-        }
-        
         if (_userRepository.GetUserByUsername(user.Username) != null)
         {
             return BadRequest("Username already exists");
@@ -114,13 +102,9 @@ public class UsersController : ControllerBase
     }
     
     [HttpPut("{id}")]
+    [RequirePermission("users.edit")]
     public IActionResult UpdateUser(Guid id, [FromBody] User updatedUser)
     {
-        if (!_permissionService.HasPermission(User, "users.edit"))
-        {
-            return Forbid();
-        }
-        
         var result = _userRepository.UpdateUser(id, updatedUser);
         if (result == null)
         {
@@ -144,13 +128,9 @@ public class UsersController : ControllerBase
     }
     
     [HttpDelete("{id}")]
+    [RequirePermission("users.delete")]
     public IActionResult DeleteUser(Guid id)
     {
-        if (!_permissionService.HasPermission(User, "users.delete"))
-        {
-            return Forbid();
-        }
-        
         var result = _userRepository.DeleteUser(id);
         if (!result)
         {
@@ -180,14 +160,9 @@ public class UsersController : ControllerBase
     }
     
     [HttpGet("{id}/roles")]
+    [RequirePermission(new[] { "users.view", "roles.view" }, false)]
     public IActionResult GetUserRoles(Guid id)
     {
-        if (!_permissionService.HasPermission(User, "users.view") && 
-            !_permissionService.HasPermission(User, "roles.view"))
-        {
-            return Forbid();
-        }
-        
         var user = _userRepository.GetUserById(id);
         if (user == null)
         {
@@ -199,14 +174,9 @@ public class UsersController : ControllerBase
     }
     
     [HttpPost("{userId}/roles/{roleId}")]
+    [RequirePermission(new[] { "users.edit", "roles.edit" }, false)]
     public IActionResult AddRoleToUser(Guid userId, Guid roleId)
     {
-        if (!_permissionService.HasPermission(User, "users.edit") && 
-            !_permissionService.HasPermission(User, "roles.edit"))
-        {
-            return Forbid();
-        }
-        
         var user = _userRepository.GetUserById(userId);
         if (user == null)
         {
@@ -231,14 +201,9 @@ public class UsersController : ControllerBase
     }
     
     [HttpDelete("{userId}/roles/{roleId}")]
+    [RequirePermission(new[] { "users.edit", "roles.edit" }, false)]
     public IActionResult RemoveRoleFromUser(Guid userId, Guid roleId)
     {
-        if (!_permissionService.HasPermission(User, "users.edit") && 
-            !_permissionService.HasPermission(User, "roles.edit"))
-        {
-            return Forbid();
-        }
-        
         var user = _userRepository.GetUserById(userId);
         if (user == null)
         {
@@ -251,10 +216,17 @@ public class UsersController : ControllerBase
             return NotFound("Role not found");
         }
         
+        // Check if the user has this role
+        var userRoles = _roleRepository.GetUserRoles(userId);
+        if (!userRoles.Any(r => r.Id == roleId))
+        {
+            return NotFound("User does not have this role");
+        }
+        
         var result = _roleRepository.RemoveRoleFromUser(userId, roleId);
         if (!result)
         {
-            return NotFound("User does not have this role");
+            return BadRequest("Failed to remove role from user");
         }
         
         return NoContent();

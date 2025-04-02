@@ -12,36 +12,25 @@ namespace OAuthSample.Controllers;
 public class PermissionsController : ControllerBase
 {
     private readonly PermissionRepository _permissionRepository;
-    private readonly PermissionService _permissionService;
     
     public PermissionsController(
-        PermissionRepository permissionRepository,
-        PermissionService permissionService)
+        PermissionRepository permissionRepository)
     {
         _permissionRepository = permissionRepository;
-        _permissionService = permissionService;
     }
     
     [HttpGet]
+    [RequirePermission("permissions.view")]
     public IActionResult GetAllPermissions()
     {
-        if (!_permissionService.HasPermission(User, "permissions.view"))
-        {
-            return Forbid();
-        }
-        
         var permissions = _permissionRepository.GetAllPermissions();
         return Ok(permissions);
     }
     
     [HttpGet("{id}")]
+    [RequirePermission("permissions.view")]
     public IActionResult GetPermissionById(Guid id)
     {
-        if (!_permissionService.HasPermission(User, "permissions.view"))
-        {
-            return Forbid();
-        }
-        
         var permission = _permissionRepository.GetPermissionById(id);
         if (permission == null)
         {
@@ -52,13 +41,9 @@ public class PermissionsController : ControllerBase
     }
     
     [HttpPost]
+    [RequirePermission("permissions.assign")]
     public IActionResult CreatePermission([FromBody] Permission permission)
     {
-        if (!_permissionService.HasPermission(User, "permissions.assign"))
-        {
-            return Forbid();
-        }
-        
         if (_permissionRepository.GetPermissionByName(permission.Name) != null)
         {
             return BadRequest("Permission name already exists");
@@ -69,13 +54,9 @@ public class PermissionsController : ControllerBase
     }
     
     [HttpPut("{id}")]
+    [RequirePermission("permissions.assign")]
     public IActionResult UpdatePermission(Guid id, [FromBody] Permission updatedPermission)
     {
-        if (!_permissionService.HasPermission(User, "permissions.assign"))
-        {
-            return Forbid();
-        }
-        
         var result = _permissionRepository.UpdatePermission(id, updatedPermission);
         if (result == null)
         {
@@ -86,13 +67,9 @@ public class PermissionsController : ControllerBase
     }
     
     [HttpDelete("{id}")]
+    [RequirePermission("permissions.assign")]
     public IActionResult DeletePermission(Guid id)
     {
-        if (!_permissionService.HasPermission(User, "permissions.assign"))
-        {
-            return Forbid();
-        }
-        
         var result = _permissionRepository.DeletePermission(id);
         if (!result)
         {

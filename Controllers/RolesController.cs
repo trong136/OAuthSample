@@ -13,38 +13,27 @@ public class RolesController : ControllerBase
 {
     private readonly RoleRepository _roleRepository;
     private readonly PermissionRepository _permissionRepository;
-    private readonly PermissionService _permissionService;
     
     public RolesController(
         RoleRepository roleRepository,
-        PermissionRepository permissionRepository,
-        PermissionService permissionService)
+        PermissionRepository permissionRepository)
     {
         _roleRepository = roleRepository;
         _permissionRepository = permissionRepository;
-        _permissionService = permissionService;
     }
     
     [HttpGet]
+    [RequirePermission("roles.view")]
     public IActionResult GetAllRoles()
     {
-        if (!_permissionService.HasPermission(User, "roles.view"))
-        {
-            return Forbid();
-        }
-        
         var roles = _roleRepository.GetAllRoles();
         return Ok(roles);
     }
     
     [HttpGet("{id}")]
+    [RequirePermission("roles.view")]
     public IActionResult GetRoleById(Guid id)
     {
-        if (!_permissionService.HasPermission(User, "roles.view"))
-        {
-            return Forbid();
-        }
-        
         var role = _roleRepository.GetRoleById(id);
         if (role == null)
         {
@@ -66,13 +55,9 @@ public class RolesController : ControllerBase
     }
     
     [HttpPost]
+    [RequirePermission("roles.create")]
     public IActionResult CreateRole([FromBody] Role role)
     {
-        if (!_permissionService.HasPermission(User, "roles.create"))
-        {
-            return Forbid();
-        }
-        
         if (_roleRepository.GetRoleByName(role.Name) != null)
         {
             return BadRequest("Role name already exists");
@@ -83,13 +68,9 @@ public class RolesController : ControllerBase
     }
     
     [HttpPut("{id}")]
+    [RequirePermission("roles.edit")]
     public IActionResult UpdateRole(Guid id, [FromBody] Role updatedRole)
     {
-        if (!_permissionService.HasPermission(User, "roles.edit"))
-        {
-            return Forbid();
-        }
-        
         var result = _roleRepository.UpdateRole(id, updatedRole);
         if (result == null)
         {
@@ -100,13 +81,9 @@ public class RolesController : ControllerBase
     }
     
     [HttpDelete("{id}")]
+    [RequirePermission("roles.delete")]
     public IActionResult DeleteRole(Guid id)
     {
-        if (!_permissionService.HasPermission(User, "roles.delete"))
-        {
-            return Forbid();
-        }
-        
         var result = _roleRepository.DeleteRole(id);
         if (!result)
         {
@@ -117,14 +94,9 @@ public class RolesController : ControllerBase
     }
     
     [HttpGet("{id}/permissions")]
+    [RequirePermission(new[] { "roles.view", "permissions.view" }, false)]
     public IActionResult GetRolePermissions(Guid id)
     {
-        if (!_permissionService.HasPermission(User, "roles.view") && 
-            !_permissionService.HasPermission(User, "permissions.view"))
-        {
-            return Forbid();
-        }
-        
         var role = _roleRepository.GetRoleById(id);
         if (role == null)
         {
@@ -136,14 +108,9 @@ public class RolesController : ControllerBase
     }
     
     [HttpPost("{roleId}/permissions/{permissionId}")]
+    [RequirePermission(new[] { "roles.edit", "permissions.assign" }, false)]
     public IActionResult AddPermissionToRole(Guid roleId, Guid permissionId)
     {
-        if (!_permissionService.HasPermission(User, "roles.edit") && 
-            !_permissionService.HasPermission(User, "permissions.assign"))
-        {
-            return Forbid();
-        }
-        
         var role = _roleRepository.GetRoleById(roleId);
         if (role == null)
         {
@@ -168,14 +135,9 @@ public class RolesController : ControllerBase
     }
     
     [HttpDelete("{roleId}/permissions/{permissionId}")]
+    [RequirePermission(new[] { "roles.edit", "permissions.assign" }, false)]
     public IActionResult RemovePermissionFromRole(Guid roleId, Guid permissionId)
     {
-        if (!_permissionService.HasPermission(User, "roles.edit") && 
-            !_permissionService.HasPermission(User, "permissions.assign"))
-        {
-            return Forbid();
-        }
-        
         var role = _roleRepository.GetRoleById(roleId);
         if (role == null)
         {
